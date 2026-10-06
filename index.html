@@ -2,42 +2,87 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>유나 3D 어드벤처</title>
 <style>
-  body { margin: 0; overflow: hidden; font-family: sans-serif; }
-  canvas { display: block; }
-  #hud {
-    position: absolute; top: 10px; left: 10px;
-    color: white; font-size: 14px;
-    background: rgba(0,0,0,0.5); padding: 10px; border-radius: 8px;
-    user-select: none;
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
   }
-  #start-screen {
-    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  canvas { display: block; width: 100%; height: 100%; }
+  
+  #hud {
+    position: fixed; top: 10px; left: 10px;
+    color: white; font-size: 14px; z-index: 100;
+    background: rgba(0,0,0,0.6); padding: 12px 16px;
+    border-radius: 12px; user-select: none;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+  }
+  #hud div { margin: 4px 0; font-weight: 600; }
+  
+  #start-screen, #win-screen {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
     display: flex; flex-direction: column;
     justify-content: center; align-items: center;
-    background: rgba(0,0,0,0.8); color: white;
-    font-size: 24px; text-align: center;
+    background: linear-gradient(135deg, rgba(0,0,0,0.85), rgba(20,0,40,0.85));
+    color: white; font-size: 20px; text-align: center; z-index: 200;
+    padding: 20px;
   }
-  #start-screen button {
-    margin-top: 20px; padding: 15px 40px;
-    font-size: 20px; border: none;
-    border-radius: 10px; background: #ff6b9d;
-    color: white; cursor: pointer;
+  #start-screen h1 { font-size: 32px; margin-bottom: 10px; }
+  #start-screen p, #win-screen p { margin: 10px 0; opacity: 0.8; }
+  #start-screen button, #win-screen button {
+    margin-top: 20px; padding: 16px 50px;
+    font-size: 22px; border: none; border-radius: 50px;
+    background: linear-gradient(135deg, #ff6b9d, #ff85b3);
+    color: white; cursor: pointer; font-weight: 700;
+    box-shadow: 0 6px 20px rgba(255,107,157,0.4);
+    transition: transform 0.2s, box-shadow 0.2s;
   }
-  #start-screen button:hover { background: #ff85b3; }
-  #win-screen {
-    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-    display: none; flex-direction: column;
-    justify-content: center; align-items: center;
-    background: rgba(0,0,0,0.8); color: white;
-    font-size: 24px; text-align: center;
+  #start-screen button:active, #win-screen button:active {
+    transform: scale(0.95);
+    box-shadow: 0 3px 10px rgba(255,107,157,0.3);
   }
-  #win-screen button {
-    margin-top: 20px; padding: 15px 40px;
-    font-size: 20px; border: none;
-    border-radius: 10px; background: #4CAF50;
-    color: white; cursor: pointer;
+  #win-screen { display: none; }
+  #win-screen h1 { color: #FFD700; font-size: 36px; }
+  
+  #mobile-controls {
+    position: fixed; bottom: 20px; left: 20px;
+    z-index: 150; display: none;
+  }
+  .control-row { display: flex; gap: 10px; margin-bottom: 10px; }
+  .ctrl-btn {
+    width: 60px; height: 60px; border-radius: 50%;
+    background: rgba(255,255,255,0.2); border: 2px solid rgba(255,255,255,0.4);
+    color: white; font-size: 24px; font-weight: 700;
+    display: flex; justify-content: center; align-items: center;
+    user-select: none; backdrop-filter: blur(5px);
+    transition: background 0.1s;
+  }
+  .ctrl-btn:active { background: rgba(255,107,157,0.6); }
+  
+  #jump-btn {
+    position: fixed; bottom: 20px; right: 20px;
+    width: 80px; height: 80px; border-radius: 50%;
+    background: rgba(255,107,157,0.5); border: 3px solid rgba(255,255,255,0.6);
+    color: white; font-size: 18px; font-weight: 700;
+    display: none; justify-content: center; align-items: center;
+    user-select: none; z-index: 150;
+    backdrop-filter: blur(5px);
+    box-shadow: 0 4px 15px rgba(255,107,157,0.3);
+  }
+  #jump-btn:active { background: rgba(255,107,157,0.8); transform: scale(0.95); }
+  
+  #particles {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none; z-index: 50;
+  }
+  @keyframes particle-fly {
+    0% { transform: translate(0,0) scale(1); opacity: 1; }
+    100% { transform: translate(var(--dx), var(--dy)) scale(0); opacity: 0; }
   }
 </style>
 </head>
@@ -61,172 +106,345 @@
   <button id="restart-btn">다시 하기</button>
 </div>
 
+<div id="particles"></div>
+
+<div id="mobile-controls">
+  <div class="control-row">
+    <div class="ctrl-btn" id="btn-up">▲</div>
+  </div>
+  <div class="control-row">
+    <div class="ctrl-btn" id="btn-left">◀</div>
+    <div class="ctrl-btn" id="btn-right">▶</div>
+  </div>
+  <div class="control-row">
+    <div class="ctrl-btn" id="btn-down">▼</div>
+  </div>
+</div>
+
+<div id="jump-btn">점프</div>
+
 <script type="module">
 import * as THREE from 'https://unpkg.com/three@0.158.0/build/three.module.js';
 
-// ===== Game State =====
+// Detect mobile
+const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+  || ('ontouchstart' in window && window.innerWidth < 1024);
+
+if (isMobile) {
+  document.getElementById('mobile-controls').style.display = 'block';
+  document.getElementById('jump-btn').style.display = 'flex';
+}
+
 let score = 0, collected = 0, startTime = 0, elapsed = 0;
 let gameOver = false, gameStarted = false;
 const gems = [];
 let character;
+const obstacles = [];
 
-// ===== Scene Setup =====
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x87CEEB); // Sky blue
-scene.fog = new THREE.Fog(0x87CEEB, 20, 100);
+scene.background = new THREE.Color(0x87CEEB);
+scene.fog = new THREE.FogExp2(0x87CEEB, 0.008);
 
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-camera.position.set(0, 5, 10);
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 200);
+camera.position.set(0, 10, 15);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
 
-// ===== Lights =====
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
 scene.add(ambientLight);
 
-const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-dirLight.position.set(10, 20, 10);
+const hemisphereLight = new THREE.HemisphereLight(0x87CEEB, 0x4CAF50, 0.6);
+scene.add(hemisphereLight);
+
+const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+dirLight.position.set(20, 30, 20);
 dirLight.castShadow = true;
 dirLight.shadow.mapSize.width = 2048;
 dirLight.shadow.mapSize.height = 2048;
 dirLight.shadow.camera.near = 0.5;
-dirLight.shadow.camera.far = 50;
+dirLight.shadow.camera.far = 100;
+dirLight.shadow.camera.left = -50;
+dirLight.shadow.camera.right = 50;
+dirLight.shadow.camera.top = 50;
+dirLight.shadow.camera.bottom = -50;
+dirLight.shadow.bias = -0.0001;
 scene.add(dirLight);
 
-// ===== Ground =====
-const groundGeo = new THREE.PlaneGeometry(100, 100);
-const groundMat = new THREE.MeshLambertMaterial({ color: 0x4CAF50 });
+const groundGeo = new THREE.PlaneGeometry(200, 200, 32, 32);
+const groundMat = new THREE.MeshPhongMaterial({ 
+  color: 0x4CAF50,
+  specular: 0x333333,
+  shininess: 20
+});
 const ground = new THREE.Mesh(groundGeo, groundMat);
 ground.rotation.x = -Math.PI / 2;
 ground.receiveShadow = true;
 scene.add(ground);
 
-// Ground grid lines
-const gridHelper = new THREE.GridHelper(100, 50, 0x388E3C, 0x388E3C);
-gridHelper.position.y = 0.01;
-scene.add(gridHelper);
-
-// ===== Trees (environment) =====
-for (let i = 0; i < 20; i++) {
-  const x = (Math.random() - 0.5) * 80;
-  const z = (Math.random() - 0.5) * 80;
-  if (Math.abs(x) < 5 && Math.abs(z) < 5) continue;
-
-  const trunkGeo = new THREE.CylinderGeometry(0.3, 0.5, 2, 8);
-  const trunkMat = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
-  const trunk = new THREE.Mesh(trunkGeo, trunkMat);
-  trunk.position.set(x, 1, z);
-  trunk.castShadow = true;
-  scene.add(trunk);
-
-  const leavesGeo = new THREE.SphereGeometry(1.5, 8, 8);
-  const leavesMat = new THREE.MeshLambertMaterial({ color: 0x228B22 });
-  const leaves = new THREE.Mesh(leavesGeo, leavesMat);
-  leaves.position.set(x, 3, z);
-  leaves.castShadow = true;
-  scene.add(leaves);
+// Grass blades
+for (let i = 0; i < 500; i++) {
+  const x = (Math.random() - 0.5) * 180;
+  const z = (Math.random() - 0.5) * 180;
+  const grassGeo = new THREE.ConeGeometry(0.05, 0.3 + Math.random() * 0.2, 4);
+  const grassMat = new THREE.MeshLambertMaterial({ 
+    color: new THREE.Color(0.2 + Math.random()*0.1, 0.5 + Math.random()*0.2, 0.1) 
+  });
+  const grass = new THREE.Mesh(grassGeo, grassMat);
+  grass.position.set(x, 0.15, z);
+  scene.add(grass);
 }
 
-// ===== Rocks =====
-for (let i = 0; i < 10; i++) {
-  const rockGeo = new THREE.DodecahedronGeometry(0.5 + Math.random() * 0.5, 1);
-  const rockMat = new THREE.MeshLambertMaterial({ color: 0x888888 });
+function createTree(x, z) {
+  const tree = new THREE.Group();
+  const trunkGeo = new THREE.CylinderGeometry(0.2, 0.4, 2.5, 8);
+  const trunkMat = new THREE.MeshPhongMaterial({ color: 0x6B4423, specular: 0x222222 });
+  const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+  trunk.position.y = 1.25;
+  trunk.castShadow = true;
+  tree.add(trunk);
+  for (let layer = 0; layer < 3; layer++) {
+    const leafGeo = new THREE.SphereGeometry(1.8 - layer * 0.4, 8, 6);
+    const leafMat = new THREE.MeshPhongMaterial({ 
+      color: new THREE.Color(0.1 + layer * 0.05, 0.4 + layer * 0.1, 0.05),
+      specular: 0x222222,
+      shininess: 10
+    });
+    const leaves = new THREE.Mesh(leafGeo, leafMat);
+    leaves.position.y = 3 + layer * 0.8;
+    leaves.castShadow = true;
+    leaves.receiveShadow = true;
+    tree.add(leaves);
+  }
+  tree.position.set(x, 0, z);
+  scene.add(tree);
+  return tree;
+}
+
+for (let i = 0; i < 25; i++) {
+  const x = (Math.random() - 0.5) * 160;
+  const z = (Math.random() - 0.5) * 160;
+  if (Math.abs(x) < 8 && Math.abs(z) < 8) continue;
+  createTree(x, z);
+}
+
+function createRock(x, z, size) {
+  const rockGeo = new THREE.DodecahedronGeometry(size, 1);
+  const pos = rockGeo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const v = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));
+    v.multiplyScalar(1 + (Math.random() - 0.5) * 0.2);
+    pos.setXYZ(i, v.x, v.y, v.z);
+  }
+  rockGeo.computeVertexNormals();
+  const rockMat = new THREE.MeshPhongMaterial({ 
+    color: new THREE.Color(0.4 + Math.random()*0.2, 0.4 + Math.random()*0.2, 0.4 + Math.random()*0.2),
+    specular: 0x444444,
+    shininess: 15
+  });
   const rock = new THREE.Mesh(rockGeo, rockMat);
-  rock.position.set(
-    (Math.random() - 0.5) * 80,
-    0.5,
-    (Math.random() - 0.5) * 80
-  );
+  rock.position.set(x, size * 0.7, z);
+  rock.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
   rock.castShadow = true;
   rock.receiveShadow = true;
   scene.add(rock);
+  obstacles.push({ mesh: rock, radius: size * 1.2 });
 }
 
-// ===== Character (cute cube character) =====
+for (let i = 0; i < 15; i++) {
+  const x = (Math.random() - 0.5) * 100;
+  const z = (Math.random() - 0.5) * 100;
+  if (Math.abs(x) < 5 && Math.abs(z) < 5) continue;
+  createRock(x, z, 0.3 + Math.random() * 0.5);
+}
+
+// Flowers
+for (let i = 0; i < 100; i++) {
+  const x = (Math.random() - 0.5) * 150;
+  const z = (Math.random() - 0.5) * 150;
+  const stemGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.3, 4);
+  const stemMat = new THREE.MeshLambertMaterial({ color: 0x228B22 });
+  const stem = new THREE.Mesh(stemGeo, stemMat);
+  stem.position.set(x, 0.15, z);
+  scene.add(stem);
+  const colors = [0xFF6B9D, 0xFFD700, 0xFF6347, 0x9370DB, 0xFFFFFF];
+  const color = colors[Math.floor(Math.random() * colors.length)];
+  const headGeo = new THREE.SphereGeometry(0.08, 6, 4);
+  const headMat = new THREE.MeshLambertMaterial({ color: color });
+  const head = new THREE.Mesh(headGeo, headMat);
+  head.position.set(x, 0.35, z);
+  scene.add(head);
+}
+
 function createCharacter() {
   const charGroup = new THREE.Group();
-
-  // Body
-  const bodyGeo = new THREE.BoxGeometry(1, 1, 1);
-  const bodyMat = new THREE.MeshLambertMaterial({ color: 0xFF6B9D });
+  const bodyGeo = new THREE.BoxGeometry(0.9, 1.0, 0.9, 2, 2, 2);
+  const pos = bodyGeo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    let v = new THREE.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));
+    v = v.clone().multiplyScalar(0.95);
+    pos.setXYZ(i, v.x, v.y, v.z);
+  }
+  bodyGeo.computeVertexNormals();
+  const bodyMat = new THREE.MeshPhongMaterial({ 
+    color: 0xFF6B9D,
+    specular: 0xFFB6C1,
+    shininess: 60
+  });
   const body = new THREE.Mesh(bodyGeo, bodyMat);
   body.position.y = 0.5;
   body.castShadow = true;
   charGroup.add(body);
-
-  // Eyes
-  const eyeGeo = new THREE.SphereGeometry(0.1, 8, 8);
-  const eyeMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
-
-  const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
-  leftEye.position.set(-0.2, 0.65, 0.45);
-  charGroup.add(leftEye);
-
-  const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
-  rightEye.position.set(0.2, 0.65, 0.45);
-  charGroup.add(rightEye);
-
-  // Mouth (smile)
-  const mouthGeo = new THREE.TorusGeometry(0.1, 0.02, 4, 8, Math.PI);
-  const mouthMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
-  const mouth = new THREE.Mesh(mouthGeo, mouthMat);
-  mouth.position.set(0, 0.4, 0.45);
-  mouth.rotation.x = Math.PI;
-  charGroup.add(mouth);
-
-  // Cheeks (blush)
-  const cheekGeo = new THREE.SphereGeometry(0.08, 8, 8);
-  const cheekMat = new THREE.MeshBasicMaterial({ color: 0xFFB6C1 });
+  
+  const eyeGeo = new THREE.SphereGeometry(0.12, 12, 8);
+  const eyeWhiteMat = new THREE.MeshPhongMaterial({ color: 0xFFFFFF });
+  const pupilGeo = new THREE.SphereGeometry(0.06, 8, 6);
+  const pupilMat = new THREE.MeshBasicMaterial({ color: 0x222222 });
+  
+  const leftEyeWhite = new THREE.Mesh(eyeGeo, eyeWhiteMat);
+  leftEyeWhite.position.set(-0.2, 0.7, 0.4);
+  charGroup.add(leftEyeWhite);
+  const leftPupil = new THREE.Mesh(pupilGeo, pupilMat);
+  leftPupil.position.set(-0.2, 0.72, 0.48);
+  charGroup.add(leftPupil);
+  
+  const rightEyeWhite = new THREE.Mesh(eyeGeo, eyeWhiteMat);
+  rightEyeWhite.position.set(0.2, 0.7, 0.4);
+  charGroup.add(rightEyeWhite);
+  const rightPupil = new THREE.Mesh(pupilGeo, pupilMat);
+  rightPupil.position.set(0.2, 0.72, 0.48);
+  charGroup.add(rightPupil);
+  
+  const cheekGeo = new THREE.SphereGeometry(0.1, 8, 6);
+  const cheekMat = new THREE.MeshBasicMaterial({ color: 0xFFB6C1, transparent: true, opacity: 0.6 });
   const leftCheek = new THREE.Mesh(cheekGeo, cheekMat);
-  leftCheek.position.set(-0.3, 0.5, 0.4);
+  leftCheek.position.set(-0.3, 0.55, 0.4);
   charGroup.add(leftCheek);
   const rightCheek = new THREE.Mesh(cheekGeo, cheekMat);
-  rightCheek.position.set(0.3, 0.5, 0.4);
+  rightCheek.position.set(0.3, 0.55, 0.4);
   charGroup.add(rightCheek);
-
+  
+  const smileGeo = new THREE.TorusGeometry(0.1, 0.02, 4, 8, Math.PI);
+  const smileMat = new THREE.MeshBasicMaterial({ color: 0x663333 });
+  const smile = new THREE.Mesh(smileGeo, smileMat);
+  smile.position.set(0, 0.45, 0.42);
+  smile.rotation.x = Math.PI;
+  charGroup.add(smile);
+  
+  const sparkleGeo = new THREE.OctahedronGeometry(0.03, 0);
+  const sparkleMat = new THREE.MeshBasicMaterial({ 
+    color: 0xFFFFFF,
+    transparent: true,
+    opacity: 0.8
+  });
+  for (let i = 0; i < 5; i++) {
+    const sparkle = new THREE.Mesh(sparkleGeo, sparkleMat);
+    const angle = (i / 5) * Math.PI * 2;
+    sparkle.position.set(
+      Math.cos(angle) * 0.7,
+      0.5 + Math.sin(angle) * 0.4,
+      Math.sin(angle) * 0.5
+    );
+    sparkle.userData = { angle: angle, speed: 1 + Math.random() };
+    charGroup.add(sparkle);
+  }
+  
   scene.add(charGroup);
   return charGroup;
 }
 
 character = createCharacter();
 
-// ===== Gems to collect =====
-const gemGeo = new THREE.OctahedronGeometry(0.5, 0);
-const gemMat = new THREE.MeshPhongMaterial({
-  color: 0xFFD700,
-  emissive: 0xFFD700,
-  emissiveIntensity: 0.3,
-  shininess: 100,
-  transparent: true,
-  opacity: 0.8
-});
-
+const gemGeo = new THREE.OctahedronGeometry(0.5, 1);
 const gemPositions = [
   [10, 1, 10], [-10, 1, 10], [10, 1, -10],
   [-10, 1, -10], [0, 1, 15]
 ];
 
 gemPositions.forEach(pos => {
-  const gem = new THREE.Mesh(gemGeo, gemMat.clone());
+  const gemMat = new THREE.MeshPhongMaterial({
+    color: 0xFFD700,
+    emissive: 0xFFA500,
+    emissiveIntensity: 0.4,
+    specular: 0xFFFFFF,
+    shininess: 100,
+    transparent: true,
+    opacity: 0.9
+  });
+  const gem = new THREE.Mesh(gemGeo, gemMat);
   gem.position.set(pos[0], pos[1], pos[2]);
   gem.castShadow = true;
   scene.add(gem);
-  gems.push({ mesh: gem, collected: false, baseY: pos[1] });
+  
+  const ringGeo = new THREE.RingGeometry(0.6, 0.7, 16);
+  const ringMat = new THREE.MeshBasicMaterial({ 
+    color: 0xFFD700, 
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: 0.5
+  });
+  const ring = new THREE.Mesh(ringGeo, ringMat);
+  ring.position.set(pos[0], 0.1, pos[2]);
+  ring.rotation.x = -Math.PI / 2;
+  scene.add(ring);
+  
+  gems.push({ mesh: gem, ring: ring, collected: false, baseY: pos[1] });
 });
 
-// ===== Controls =====
 const keys = {};
 window.addEventListener('keydown', e => { keys[e.code] = true; });
 window.addEventListener('keyup', e => { keys[e.code] = false; });
 
-// ===== Game Loop =====
+let touchUp = false, touchDown = false, touchLeft = false, touchRight = false, touchJump = false;
+
+function setupMobileButton(id, onDown, onUp) {
+  const btn = document.getElementById(id);
+  btn.addEventListener('touchstart', e => { e.preventDefault(); onDown(); });
+  btn.addEventListener('touchend', e => { e.preventDefault(); onUp(); });
+  btn.addEventListener('touchcancel', e => { e.preventDefault(); onUp(); });
+}
+
+if (isMobile) {
+  setupMobileButton('btn-up', () => touchUp = true, () => touchUp = false);
+  setupMobileButton('btn-down', () => touchDown = true, () => touchDown = false);
+  setupMobileButton('btn-left', () => touchLeft = true, () => touchLeft = false);
+  setupMobileButton('btn-right', () => touchRight = true, () => touchRight = false);
+  setupMobileButton('jump-btn', () => touchJump = true, () => touchJump = false);
+}
+
+const particlesContainer = document.getElementById('particles');
+function spawnParticles(x, y, count, color) {
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement('div');
+    p.style.cssText = 'position: absolute; left: ' + x + 'px; top: ' + y + 'px; width: 8px; height: 8px; border-radius: 50%; background: ' + color + '; pointer-events: none; z-index: 50; animation: particle-fly 0.8s ease-out forwards;';
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 30 + Math.random() * 50;
+    p.style.setProperty('--dx', Math.cos(angle) * dist + 'px');
+    p.style.setProperty('--dy', Math.sin(angle) * dist + 'px');
+    particlesContainer.appendChild(p);
+    setTimeout(() => p.remove(), 800);
+  }
+}
+
 let clock = new THREE.Clock();
 let characterVelocity = { x: 0, y: 0, z: 0 };
 let isJumping = false;
+
+function checkCollisions(newX, newZ) {
+  for (const obs of obstacles) {
+    const dx = newX - obs.mesh.position.x;
+    const dz = newZ - obs.mesh.position.z;
+    const dist = Math.sqrt(dx*dx + dz*dz);
+    if (dist < obs.radius + 0.5) {
+      return true;
+    }
+  }
+  return false;
+}
 
 function update(delta) {
   if (!gameStarted || gameOver) return;
@@ -234,36 +452,39 @@ function update(delta) {
   elapsed = clock.getElapsedTime() - startTime;
   document.getElementById('time').textContent = Math.floor(elapsed);
 
-  // Movement
-  const speed = 10;
+  const speed = 8;
   let moved = false;
   let moveDir = { x: 0, z: 0 };
 
-  if (keys['KeyW'] || keys['ArrowUp']) { moveDir.z = -1; moved = true; }
-  if (keys['KeyS'] || keys['ArrowDown']) { moveDir.z = 1; moved = true; }
-  if (keys['KeyA'] || keys['ArrowLeft']) { moveDir.x = -1; moved = true; }
-  if (keys['KeyD'] || keys['ArrowRight']) { moveDir.x = 1; moved = true; }
+  if (keys['KeyW'] || keys['ArrowUp'] || touchUp) { moveDir.z = -1; moved = true; }
+  if (keys['KeyS'] || keys['ArrowDown'] || touchDown) { moveDir.z = 1; moved = true; }
+  if (keys['KeyA'] || keys['ArrowLeft'] || touchLeft) { moveDir.x = -1; moved = true; }
+  if (keys['KeyD'] || keys['ArrowRight'] || touchRight) { moveDir.x = 1; moved = true; }
 
   if (moved) {
     const length = Math.sqrt(moveDir.x * moveDir.x + moveDir.z * moveDir.z);
     moveDir.x /= length;
     moveDir.z /= length;
 
-    // Face movement direction
     character.rotation.y = Math.atan2(moveDir.x, moveDir.z);
 
-    character.position.x += moveDir.x * speed * delta;
-    character.position.z += moveDir.z * speed * delta;
+    const newX = character.position.x + moveDir.x * speed * delta;
+    const newZ = character.position.z + moveDir.z * speed * delta;
+
+    if (!checkCollisions(newX, character.position.z)) {
+      character.position.x = newX;
+    }
+    if (!checkCollisions(character.position.x, newZ)) {
+      character.position.z = newZ;
+    }
   }
 
-  // Jump
-  if (keys['Space'] && !isJumping) {
-    characterVelocity.y = 12;
+  if ((keys['Space'] || touchJump) && !isJumping) {
+    characterVelocity.y = 10;
     isJumping = true;
   }
 
-  // Gravity
-  characterVelocity.y -= 30 * delta;
+  characterVelocity.y -= 25 * delta;
   character.position.y += characterVelocity.y * delta;
 
   if (character.position.y <= 0) {
@@ -272,55 +493,75 @@ function update(delta) {
     isJumping = false;
   }
 
-  // Camera follow
-  camera.position.x = character.position.x;
-  camera.position.y = character.position.y + 8;
-  camera.position.z = character.position.z + 10;
-  camera.lookAt(character.position);
+  const targetX = character.position.x;
+  const targetZ = character.position.z + 12;
+  camera.position.x += (targetX - camera.position.x) * 0.05;
+  camera.position.z += (targetZ - camera.position.z) * 0.05;
+  camera.position.y = 10;
+  camera.lookAt(character.position.x, character.position.y + 1, character.position.z);
 
-  // Gem collection
+  if (moved && !isJumping) {
+    const bounce = Math.sin(clock.getElapsedTime() * 15) * 0.05;
+    character.children[0].position.y = 0.5 + bounce;
+  }
+
+  character.children.forEach((child, i) => {
+    if (i >= 9 && child.userData.angle !== undefined) {
+      child.rotation.y += delta * child.userData.speed;
+      const t = clock.getElapsedTime() * child.userData.speed;
+      child.position.y = 0.5 + Math.sin(t + child.userData.angle) * 0.3;
+    }
+  });
+
   gems.forEach(gem => {
     if (gem.collected) return;
 
-    // Rotate gem
-    gem.mesh.rotation.y += delta * 2;
-    gem.mesh.rotation.x += delta;
-    // Bob up and down
-    gem.mesh.position.y = gem.baseY + Math.sin(clock.getElapsedTime() * 2) * 0.2;
+    gem.mesh.rotation.y += delta * 3;
+    gem.mesh.rotation.x += delta * 1.5;
+    gem.mesh.position.y = gem.baseY + Math.sin(clock.getElapsedTime() * 2.5) * 0.3;
+    gem.ring.rotation.z += delta * 0.5;
+    gem.ring.material.opacity = 0.3 + Math.sin(clock.getElapsedTime() * 2) * 0.2;
 
     const dist = character.position.distanceTo(gem.mesh.position);
     if (dist < 1.5) {
       gem.collected = true;
       gem.mesh.visible = false;
+      gem.ring.visible = false;
       collected++;
       score += 100;
       document.getElementById('score').textContent = score;
       document.getElementById('collected').textContent = collected;
 
+      const screenPos = gem.mesh.position.clone().project(camera);
+      const sx = (screenPos.x * 0.5 + 0.5) * window.innerWidth;
+      const sy = (-screenPos.y * 0.5 + 0.5) * window.innerHeight;
+      spawnParticles(sx, sy, 20, '#FFD700');
+
       if (collected >= 5) {
         gameOver = true;
         const winScreen = document.getElementById('win-screen');
         winScreen.style.display = 'flex';
+        const bonus = Math.max(0, 1000 - elapsed * 10);
+        score += bonus;
+        document.getElementById('score').textContent = score;
         document.getElementById('win-text').textContent =
-          `${Math.floor(elapsed)}초 만에 모든 보석을 수집했습니다! 점수: ${score + Math.max(0, 1000 - elapsed * 10)}`;
-        score += Math.max(0, 1000 - elapsed * 10);
+          Math.floor(elapsed) + '초 만에 모든 보석을 수집했습니다! 점수: ' + score;
+        spawnParticles(window.innerWidth/2, window.innerHeight/2, 50, '#FFD700');
       }
     }
   });
 
-  // Boundary check
-  if (Math.abs(character.position.x) > 45) character.position.x = Math.sign(character.position.x) * 45;
-  if (Math.abs(character.position.z) > 45) character.position.z = Math.sign(character.position.z) * 45;
+  if (Math.abs(character.position.x) > 90) character.position.x = Math.sign(character.position.x) * 90;
+  if (Math.abs(character.position.z) > 90) character.position.z = Math.sign(character.position.z) * 90;
 }
 
 function animate() {
   requestAnimationFrame(animate);
-  const delta = clock.getDelta();
+  const delta = Math.min(clock.getDelta(), 0.05);
   update(delta);
   renderer.render(scene, camera);
 }
 
-// ===== Start/Restart =====
 document.getElementById('start-btn').addEventListener('click', () => {
   document.getElementById('start-screen').style.display = 'none';
   gameStarted = true;
@@ -328,7 +569,6 @@ document.getElementById('start-btn').addEventListener('click', () => {
 });
 
 document.getElementById('restart-btn').addEventListener('click', () => {
-  // Reset state
   score = 0; collected = 0; gameOver = false;
   document.getElementById('score').textContent = '0';
   document.getElementById('collected').textContent = '0';
@@ -340,19 +580,18 @@ document.getElementById('restart-btn').addEventListener('click', () => {
   gems.forEach(gem => {
     gem.collected = false;
     gem.mesh.visible = true;
+    gem.ring.visible = true;
   });
 
   startTime = clock.getElapsedTime();
 });
 
-// ===== Resize =====
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// Start animation loop
 animate();
 </script>
 </body>
