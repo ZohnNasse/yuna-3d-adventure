@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>유나 3D 어드벤처</title>
+<style>
+  body { margin: 0; overflow: hidden; font-family: sans-serif; }
+  canvas { display: block; }
+  #hud {
+    position: absolute; top: 10px; left: 10px;
+    color: white; font-size: 14px;
+    background: rgba(0,0,0,0.5); padding: 10px; border-radius: 8px;
+    user-select: none;
+  }
+  #start-screen {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    display: flex; flex-direction: column;
+    justify-content: center; align-items: center;
+    background: rgba(0,0,0,0.8); color: white;
+    font-size: 24px; text-align: center;
+  }
+  #start-screen button {
+    margin-top: 20px; padding: 15px 40px;
+    font-size: 20px; border: none;
+    border-radius: 10px; background: #ff6b9d;
+    color: white; cursor: pointer;
+  }
+  #start-screen button:hover { background: #ff85b3; }
+  #win-screen {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    display: none; flex-direction: column;
+    justify-content: center; align-items: center;
+    background: rgba(0,0,0,0.8); color: white;
+    font-size: 24px; text-align: center;
+  }
+  #win-screen button {
+    margin-top: 20px; padding: 15px 40px;
+    font-size: 20px; border: none;
+    border-radius: 10px; background: #4CAF50;
+    color: white; cursor: pointer;
+  }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div>🏆 점수: <span id="score">0</span></div>
+  <div>💎 수집: <span id="collected">0</span>/5</div>
+  <div>🕐 시간: <span id="time">0</span>s</div>
+</div>
+
+<div id="start-screen">
+  <h1>🎮 유나 3D 어드벤처</h1>
+  <p>WASD/화살표: 이동 | Space: 점프 | Shift: 대시</p>
+  <p>💎 보석 5개를 모두 수집하면 승리!</p>
+  <button id="start-btn">게임 시작</button>
+</div>
+
+<div id="win-screen">
+  <h1>🎉 축하합니다!</h1>
+  <p id="win-text"></p>
+  <button id="restart-btn">다시 하기</button>
+</div>
+
+<script type="module">
+import * as THREE from 'https://cdn.skypack.dev/three@0.158.0';
+
+// ===== Game State =====
+let score = 0, collected = 0, startTime = 0, elapsed = 0;
+let gameOver = false, gameStarted = false;
+const gems = [];
+let character;
+
+// ===== Scene Setup =====
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87CEEB); // Sky blue
+scene.fog = new THREE.Fog(0x87CEEB, 20, 100);
+
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+camera.position.set(0, 5, 10);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+// ===== Lights =====
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+scene.add(ambientLight);
+
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+dirLight.position.set(10, 20, 10);
+dirLight.castShadow = true;
+dirLight.shadow.mapSize.width = 2048;
+dirLight.shadow.mapSize.height = 2048;
+dirLight.shadow.camera.near = 0.5;
+dirLight.shadow.camera.far = 50;
+scene.add(dirLight);
+
+// ===== Ground =====
+const groundGeo = new THREE.PlaneGeometry(100, 100);
+const groundMat = new THREE.MeshLambertMaterial({ color: 0x4CAF50 });
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// Ground grid lines
+const gridHelper = new THREE.GridHelper(100, 50, 0x388E3C, 0x388E3C);
+gridHelper.position.y = 0.01;
+scene.add(gridHelper);
+
+// ===== Trees (environment) =====
+for (let i = 0; i < 20; i++) {
+  const x = (Math.random() - 0.5) * 80;
+  const z = (Math.random() - 0.5) * 80;
+  if (Math.abs(x) < 5 && Math.abs(z) < 5) continue;
+
+  const trunkGeo = new THREE.CylinderGeometry(0.3, 0.5, 2, 8);
+  const trunkMat = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
+  const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+  trunk.position.set(x, 1, z);
+  trunk.castShadow = true;
+  scene.add(trunk);
+
+  const leavesGeo = new THREE.SphereGeometry(1.5, 8, 8);
+  const leavesMat = new THREE.MeshLambertMaterial({ color: 0x228B22 });
+  const leaves = new THREE.Mesh(leavesGeo, leavesMat);
+  leaves.position.set(x, 3, z);
+  leaves.castShadow = true;
+  scene.add(leaves);
+}
+
+// ===== Rocks =====
+for (let i = 0; i < 10; i++) {
+  const rockGeo = new THREE.DodecahedronGeometry(0.5 + Math.random() * 0.5, 1);
+  const rockMat = new THREE.MeshLambertMaterial({ color: 0x888888 });
+  const rock = new THREE.Mesh(rockGeo, rockMat);
+  rock.position.set(
+    (Math.random() - 0.5) * 80,
+    0.5,
+    (Math.random() - 0.5) * 80
+  );
+  rock.castShadow = true;
+  rock.receiveShadow = true;
+  scene.add(rock);
+}
+
+// ===== Character (cute cube character) =====
+function createCharacter() {
+  const charGroup = new THREE.Group();
+
+  // Body
+  const bodyGeo = new THREE.BoxGeometry(1, 1, 1);
+  const bodyMat = new THREE.MeshLambertMaterial({ color: 0xFF6B9D });
+  const body = new THREE.Mesh(bodyGeo, bodyMat);
+  body.position.y = 0.5;
+  body.castShadow = true;
+  charGroup.add(body);
+
+  // Eyes
+  const eyeGeo = new THREE.SphereGeometry(0.1, 8, 8);
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+
+  const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
+  leftEye.position.set(-0.2, 0.65, 0.45);
+  charGroup.add(leftEye);
+
+  const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
+  rightEye.position.set(0.2, 0.65, 0.45);
+  charGroup.add(rightEye);
+
+  // Mouth (smile)
+  const mouthGeo = new THREE.TorusGeometry(0.1, 0.02, 4, 8, Math.PI);
+  const mouthMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+  const mouth = new THREE.Mesh(mouthGeo, mouthMat);
+  mouth.position.set(0, 0.4, 0.45);
+  mouth.rotation.x = Math.PI;
+  charGroup.add(mouth);
+
+  // Cheeks (blush)
+  const cheekGeo = new THREE.SphereGeometry(0.08, 8, 8);
+  const cheekMat = new THREE.MeshBasicMaterial({ color: 0xFFB6C1 });
+  const leftCheek = new THREE.Mesh(cheekGeo, cheekMat);
+  leftCheek.position.set(-0.3, 0.5, 0.4);
+  charGroup.add(leftCheek);
+  const rightCheek = new THREE.Mesh(cheekGeo, cheekMat);
+  rightCheek.position.set(0.3, 0.5, 0.4);
+  charGroup.add(rightCheek);
+
+  scene.add(charGroup);
+  return charGroup;
+}
+
+character = createCharacter();
+
+// ===== Gems to collect =====
+const gemGeo = new THREE.OctahedronGeometry(0.5, 0);
+const gemMat = new THREE.MeshPhongMaterial({
+  color: 0xFFD700,
+  emissive: 0xFFD700,
+  emissiveIntensity: 0.3,
+  shininess: 100,
+  transparent: true,
+  opacity: 0.8
+});
+
+const gemPositions = [
+  [10, 1, 10], [-10, 1, 10], [10, 1, -10],
+  [-10, 1, -10], [0, 1, 15]
+];
+
+gemPositions.forEach(pos => {
+  const gem = new THREE.Mesh(gemGeo, gemMat.clone());
+  gem.position.set(pos[0], pos[1], pos[2]);
+  gem.castShadow = true;
+  scene.add(gem);
+  gems.push({ mesh: gem, collected: false, baseY: pos[1] });
+});
+
+// ===== Controls =====
+const keys = {};
+window.addEventListener('keydown', e => { keys[e.code] = true; });
+window.addEventListener('keyup', e => { keys[e.code] = false; });
+
+// ===== Game Loop =====
+let clock = new THREE.Clock();
+let characterVelocity = { x: 0, y: 0, z: 0 };
+let isJumping = false;
+
+function update(delta) {
+  if (!gameStarted || gameOver) return;
+
+  elapsed = clock.getElapsedTime() - startTime;
+  document.getElementById('time').textContent = Math.floor(elapsed);
+
+  // Movement
+  const speed = 10;
+  let moved = false;
+  let moveDir = { x: 0, z: 0 };
+
+  if (keys['KeyW'] || keys['ArrowUp']) { moveDir.z = -1; moved = true; }
+  if (keys['KeyS'] || keys['ArrowDown']) { moveDir.z = 1; moved = true; }
+  if (keys['KeyA'] || keys['ArrowLeft']) { moveDir.x = -1; moved = true; }
+  if (keys['KeyD'] || keys['ArrowRight']) { moveDir.x = 1; moved = true; }
+
+  if (moved) {
+    const length = Math.sqrt(moveDir.x * moveDir.x + moveDir.z * moveDir.z);
+    moveDir.x /= length;
+    moveDir.z /= length;
+
+    // Face movement direction
+    character.rotation.y = Math.atan2(moveDir.x, moveDir.z);
+
+    character.position.x += moveDir.x * speed * delta;
+    character.position.z += moveDir.z * speed * delta;
+  }
+
+  // Jump
+  if (keys['Space'] && !isJumping) {
+    characterVelocity.y = 12;
+    isJumping = true;
+  }
+
+  // Gravity
+  characterVelocity.y -= 30 * delta;
+  character.position.y += characterVelocity.y * delta;
+
+  if (character.position.y <= 0) {
+    character.position.y = 0;
+    characterVelocity.y = 0;
+    isJumping = false;
+  }
+
+  // Camera follow
+  camera.position.x = character.position.x;
+  camera.position.y = character.position.y + 8;
+  camera.position.z = character.position.z + 10;
+  camera.lookAt(character.position);
+
+  // Gem collection
+  gems.forEach(gem => {
+    if (gem.collected) return;
+
+    // Rotate gem
+    gem.mesh.rotation.y += delta * 2;
+    gem.mesh.rotation.x += delta;
+    // Bob up and down
+    gem.mesh.position.y = gem.baseY + Math.sin(clock.getElapsedTime() * 2) * 0.2;
+
+    const dist = character.position.distanceTo(gem.mesh.position);
+    if (dist < 1.5) {
+      gem.collected = true;
+      gem.mesh.visible = false;
+      collected++;
+      score += 100;
+      document.getElementById('score').textContent = score;
+      document.getElementById('collected').textContent = collected;
+
+      if (collected >= 5) {
+        gameOver = true;
+        const winScreen = document.getElementById('win-screen');
+        winScreen.style.display = 'flex';
+        document.getElementById('win-text').textContent =
+          `${Math.floor(elapsed)}초 만에 모든 보석을 수집했습니다! 점수: ${score + Math.max(0, 1000 - elapsed * 10)}`;
+        score += Math.max(0, 1000 - elapsed * 10);
+      }
+    }
+  });
+
+  // Boundary check
+  if (Math.abs(character.position.x) > 45) character.position.x = Math.sign(character.position.x) * 45;
+  if (Math.abs(character.position.z) > 45) character.position.z = Math.sign(character.position.z) * 45;
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  const delta = clock.getDelta();
+  update(delta);
+  renderer.render(scene, camera);
+}
+
+// ===== Start/Restart =====
+document.getElementById('start-btn').addEventListener('click', () => {
+  document.getElementById('start-screen').style.display = 'none';
+  gameStarted = true;
+  startTime = clock.getElapsedTime();
+});
+
+document.getElementById('restart-btn').addEventListener('click', () => {
+  // Reset state
+  score = 0; collected = 0; gameOver = false;
+  document.getElementById('score').textContent = '0';
+  document.getElementById('collected').textContent = '0';
+  document.getElementById('win-screen').style.display = 'none';
+
+  character.position.set(0, 0, 0);
+  characterVelocity = { x: 0, y: 0, z: 0 };
+
+  gems.forEach(gem => {
+    gem.collected = false;
+    gem.mesh.visible = true;
+  });
+
+  startTime = clock.getElapsedTime();
+});
+
+// ===== Resize =====
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// Start animation loop
+animate();
+</script>
+</body>
+</html>
