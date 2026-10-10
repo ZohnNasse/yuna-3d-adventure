@@ -138,7 +138,7 @@ function startGame() {
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.module.js';
 
 let score = 0, collected = 0, startTime = window.startTime || 0, elapsed = 0;
-let gameOver = false, gameStarted = window.gameStarted || false;
+let gameOver = false;
 const gems = [];
 let character;
 const obstacles = [];
@@ -570,7 +570,7 @@ const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
 function onGroundClick(event) {
-  if (!gameStarted || gameOver) return;
+  if (!window.gameStarted || gameOver) return;
   
   // Skip if clicking on UI
   if (event.target !== renderer.domElement) return;
@@ -663,7 +663,7 @@ function checkCollisions(newX, newZ) {
 }
 
 function update(delta) {
-  if (!gameStarted || gameOver) return;
+  if (!window.gameStarted || gameOver) return;
 
   elapsed = clock.getElapsedTime() - startTime;
   document.getElementById('time').textContent = Math.floor(elapsed);
