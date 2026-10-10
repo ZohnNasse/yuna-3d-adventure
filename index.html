@@ -144,8 +144,12 @@ let character;
 const obstacles = [];
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x87CEEB);
+scene.background = new THREE.Color(0x44ff44);
 scene.fog = new THREE.FogExp2(0x87CEEB, 0.008);
+// Debug: Add a red cube to verify renderer works
+const debugCube = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), new THREE.MeshLambertMaterial({color:0xff0000}));
+debugCube.position.set(0, 5, 0);
+scene.add(debugCube);
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 200);
 camera.position.set(0, 10, 15);
