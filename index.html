@@ -792,7 +792,35 @@ document.getElementById('start-btn').addEventListener('click', () => {
   startTime = clock.getElapsedTime();
 });
 
+document.getElementById('start-btn').addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  document.getElementById('start-screen').style.display = 'none';
+  gameStarted = true;
+  startTime = clock.getElapsedTime();
+});
+
 document.getElementById('restart-btn').addEventListener('click', () => {
+  score = 0; collected = 0; gameOver = false;
+  document.getElementById('score').textContent = '0';
+  document.getElementById('collected').textContent = '0';
+  document.getElementById('win-screen').style.display = 'none';
+
+  character.position.set(0, 0, 0);
+  characterVelocity = { x: 0, y: 0, z: 0 };
+  moving = false;
+  moveTarget = null;
+
+  gems.forEach(gem => {
+    gem.collected = false;
+    gem.mesh.visible = true;
+    gem.ring.visible = true;
+  });
+
+  startTime = clock.getElapsedTime();
+});
+
+document.getElementById('restart-btn').addEventListener('touchstart', (e) => {
+  e.preventDefault();
   score = 0; collected = 0; gameOver = false;
   document.getElementById('score').textContent = '0';
   document.getElementById('collected').textContent = '0';
