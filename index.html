@@ -113,7 +113,15 @@
   <p>PC: WASD/화살표 이동 | Space 점프 | Shift 대시</p>
   <p>모바일: 화면 탭으로 이동 | 점프 버튼</p>
   <p>💎 보석 5개를 모두 수집하면 승리!</p>
-  <button id="start-btn">시작</button>
+  <script>
+function startGame() {
+  document.getElementById('start-screen').style.display = 'none';
+  window.gameStarted = true;
+  window.startTime = Date.now();
+}
+</script>
+
+<button id="start-btn" onclick="startGame()">시작</button>
 </div>
 
 <div id="win-screen">
@@ -129,8 +137,8 @@
 <script type="module">
 import * as THREE from 'https://unpkg.com/three@0.158.0/build/three.module.js';
 
-let score = 0, collected = 0, startTime = 0, elapsed = 0;
-let gameOver = false, gameStarted = false;
+let score = 0, collected = 0, startTime = window.startTime || 0, elapsed = 0;
+let gameOver = false, gameStarted = window.gameStarted || false;
 const gems = [];
 let character;
 const obstacles = [];
