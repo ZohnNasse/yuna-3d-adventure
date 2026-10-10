@@ -113,7 +113,7 @@
   <p>PC: WASD/화살표 이동 | Space 점프 | Shift 대시</p>
   <p>모바일: 화면 탭으로 이동 | 점프 버튼</p>
   <p>💎 보석 5개를 모두 수집하면 승리!</p>
-  <button id="start-btn">시작</button>
+  <button id="start-btn" onclick="startGame()">시작</button>
 </div>
 
 <div id="win-screen">
@@ -126,14 +126,51 @@
 <div id="target-marker"></div>
 <div id="jump-btn">점프</div>
 
-<script type="module">
-import * as THREE from 'https://unpkg.com/three@0.158.0/build/three.module.js';
+<script>
+function startGame() {
+  document.getElementById('start-screen').style.display = 'none';
+  gameStarted = true;
+  startTime = clock.getElapsedTime();
+}
+
+function restartGame() {
+  score = 0; collected = 0; gameOver = false;
+  document.getElementById('score').textContent = '0';
+  document.getElementById('collected').textContent = '0';
+  document.getElementById('win-screen').style.display = 'none';
+
+  character.position.set(0, 0, 0);
+  characterVelocity = { x: 0, y: 0, z: 0 };
+  moving = false;
+  moveTarget = null;
+
+  gems.forEach(gem => {
+    gem.collected = false;
+    gem.mesh.visible = true;
+    gem.ring.visible = true;
+  });
+
+  startTime = clock.getElapsedTime();
+}
 
 let score = 0, collected = 0, startTime = 0, elapsed = 0;
 let gameOver = false, gameStarted = false;
 const gems = [];
 let character;
 const obstacles = [];
+let clock;
+let characterVelocity;
+let moving;
+let moveTarget;
+</script>
+
+<script type="module">
+import * as THREE from 'https://unpkg.com/three@0.158.0/build/three.module.js';
+
+clock = new THREE.Clock();
+characterVelocity = { x: 0, y: 0, z: 0 };
+moving = false;
+moveTarget = null;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87CEEB);
