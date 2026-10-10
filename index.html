@@ -139,6 +139,7 @@ function startGame() {
 
 let score = 0, collected = 0, startTime = window.startTime || 0, elapsed = 0;
 let gameOver = false;
+let number_trees = [];
 const gems = [];
 let character;
 const obstacles = [];
@@ -888,7 +889,6 @@ window.addEventListener('resize', () => {
 
 // Number fruit trees
 let current_sum = 0;
-let number_trees = [];
 const fruits = [];
 
 function create_number_tree(x, z) {
