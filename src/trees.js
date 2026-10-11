@@ -1,50 +1,45 @@
-// Number Fruit Tree Mini-Game
-// Shake trees to drop numbered fruits (1-9), collect them to make sums of 10
+// 나무흔들기 미니게임 — 숫자 열매 수집
+// 목표: 합이 10이 되도록 열매 주우기 (4~7세 덧셈 학습)
 
-let currentSum = 0;
-let score = 0;
-let trees = [];
+let number_trees = [];
+let current_sum = 0;
+const fruits = [];
 
-// Create a number fruit tree
 function create_number_tree(x, z) {
-    const treeGroup = new THREE.Group();
+    const tree = new THREE.Group();
     
-    // Trunk
+    // 나무 몸체
     const trunkGeo = new THREE.CylinderGeometry(0.15, 0.2, 1.5, 8);
     const trunkMat = new THREE.MeshPhongMaterial({ color: 0x8B4513, specular: 0x333333, shininess: 20 });
     const trunk = new THREE.Mesh(trunkGeo, trunkMat);
     trunk.position.y = 0.75;
     trunk.castShadow = true;
-    treeGroup.add(trunk);
+    tree.add(trunk);
     
-    // Leaves (sphere)
+    // 나뭇잎
     const leavesGeo = new THREE.SphereGeometry(0.8, 16, 12);
     const leavesMat = new THREE.MeshPhongMaterial({ color: 0x228B22, specular: 0x55FF55, shininess: 30 });
     const leaves = new THREE.Mesh(leavesGeo, leavesMat);
     leaves.position.y = 1.8;
     leaves.castShadow = true;
-    treeGroup.add(leaves);
+    tree.add(leaves);
     
-    // Fruits array (empty initially)
-    treeGroup.userData.fruits = [];
-    treeGroup.userData.trunk = trunk;
-    treeGroup.userData.leaves = leaves;
-    treeGroup.userData.lastShake = 0;
+    tree.position.set(x, 0, z);
+    tree.userData.lastShake = 0;
+    tree.userData.isFruitTree = true;
     
-    treeGroup.position.set(x, 0, z);
-    scene.add(treeGroup);
-    
-    return treeGroup;
+    scene.add(tree);
+    number_trees.push(tree);
+    return tree;
 }
 
-// Shake the tree and drop fruits
 function shake_tree(tree) {
     const now = Date.now();
-    if (now - tree.userData.lastShake < 2000) return false;
+    if (now - tree.userData.lastShake < 2000) return false; // 2초 쿨타임
     
     tree.userData.lastShake = now;
     
-    // Shake animation
+    // 흔들림 애니메이션
     const origX = tree.position.x;
     const shakeDuration = 500;
     const shakeStart = Date.now();
@@ -61,7 +56,7 @@ function shake_tree(tree) {
     }
     animateShake();
     
-    // Drop 1-3 fruits
+    // 열매 떨어뜨리기 (1~3개)
     const numFruits = Math.floor(Math.random() * 3) + 1;
     for (let i = 0; i < numFruits; i++) {
         spawn_fruit(tree);
@@ -70,10 +65,11 @@ function shake_tree(tree) {
     return true;
 }
 
-// Spawn a numbered fruit
 function spawn_fruit(tree) {
+    // 1~9 랜덤 숫자
     const value = Math.floor(Math.random() * 9) + 1;
     
+    // 열매 메쉬
     const fruitGeo = new THREE.SphereGeometry(0.15, 12, 8);
     const fruitMat = new THREE.MeshPhongMaterial({ 
         color: 0xFF6B6B, 
@@ -83,7 +79,7 @@ function spawn_fruit(tree) {
     });
     const fruit = new THREE.Mesh(fruitGeo, fruitMat);
     
-    // Random position near tree
+    // 나무 주변 랜덤 위치
     const offset = (Math.random() - 0.5) * 1.5;
     fruit.position.set(
         tree.position.x + offset,
@@ -91,7 +87,7 @@ function spawn_fruit(tree) {
         tree.position.z + (Math.random() - 0.5) * 1.5
     );
     
-    // Add value label (using sprite)
+    // 숫자 표시 (스프라이트)
     const canvas = document.createElement('canvas');
     canvas.width = 64;
     canvas.height = 64;
@@ -121,80 +117,63 @@ function spawn_fruit(tree) {
     fruit.userData.created = Date.now();
     
     scene.add(fruit);
-    tree.userData.fruits.push(fruit);
+    fruits.push(fruit);
     
     return fruit;
 }
 
-// Update all fruit trees (physics, gravity)
-function update_trees() {
+function update_fruits() {
     const now = Date.now();
-    
-    for (const tree of trees) {
-        // Update fruits
-        for (let i = tree.userData.fruits.length - 1; i >= 0; i--) {
-            const fruit = tree.userData.fruits[i];
-            
-            // Gravity
-            if (fruit.position.y > fruit.userData.groundY) {
-                fruit.userData.vy -= 0.001;
-                fruit.position.y += fruit.userData.vy;
-            } else {
-                fruit.position.y = fruit.userData.groundY;
-                fruit.userData.vy = 0;
-            }
-            
-            // Lifetime
-            if (now - fruit.userData.created > fruit.userData.lifetime) {
-                scene.remove(fruit);
-                tree.userData.fruits.splice(i, 1);
-            }
+    for (let i = fruits.length - 1; i >= 0; i--) {
+        const fruit = fruits[i];
+        
+        // 중력
+        if (fruit.position.y > fruit.userData.groundY) {
+            fruit.userData.vy -= 0.001;
+            fruit.position.y += fruit.userData.vy;
+        } else {
+            fruit.position.y = fruit.userData.groundY;
+            fruit.userData.vy = 0;
+        }
+        
+        // 수명 초과 시 제거
+        if (now - fruit.userData.created > fruit.userData.lifetime) {
+            scene.remove(fruit);
+            fruits.splice(i, 1);
         }
     }
 }
 
-// Collect fruits near player
-function collect_fruits(player) {
+function collect_fruits_near_player() {
     let collected = 0;
-    
-    for (const tree of trees) {
-        for (let i = tree.userData.fruits.length - 1; i >= 0; i--) {
-            const fruit = tree.userData.fruits[i];
-            
-            const dist = Math.sqrt(
-                (player.position.x - fruit.position.x) ** 2 +
-                (player.position.z - fruit.position.z) ** 2
-            );
-            
-            if (dist < 0.8) {
-                collected += fruit.userData.value;
-                
-                // Sparkle effect
-                create_sparkles(fruit.position.x, fruit.position.y, fruit.position.z, 0xFFD700, 8);
-                
-                // Remove fruit
-                scene.remove(fruit);
-                tree.userData.fruits.splice(i, 1);
-            }
+    for (let i = fruits.length - 1; i >= 0; i--) {
+        const fruit = fruits[i];
+        const dist = Math.sqrt(
+            (character.position.x - fruit.position.x) ** 2 +
+            (character.position.z - fruit.position.z) ** 2
+        );
+        if (dist < 0.8) {
+            collected += fruit.userData.value;
+            create_sparkles(fruit.position.x, fruit.position.y, fruit.position.z, 0xFFD700, 8);
+            scene.remove(fruit);
+            fruits.splice(i, 1);
         }
     }
     
     if (collected > 0) {
-        currentSum += collected;
+        current_sum += collected;
         score += collected;
         update_hud();
         
-        if (currentSum >= 10) {
+        if (current_sum >= 10) {
             score += 50;
             show_message("🎉 10 만들었다!");
-            currentSum = 0;
+            current_sum = 0;
         }
     }
-    
     return collected;
 }
 
-// Update HUD with current sum
 function update_hud() {
     let hud = document.getElementById('game-hud');
     if (!hud) {
@@ -212,14 +191,9 @@ function update_hud() {
         hud.style.zIndex = '1000';
         document.body.appendChild(hud);
     }
-    
-    hud.innerHTML = `
-        <div>🌳 현재 합: ${currentSum}/10</div>
-        <div>🏆 점수: ${score}</div>
-    `;
+    hud.innerHTML = '<div>🌳 현재 합: ' + current_sum + '/10</div><div>🏆 점수: ' + score + '</div>';
 }
 
-// Show temporary message
 function show_message(text) {
     let msg = document.getElementById('game-message');
     if (!msg) {
@@ -237,69 +211,51 @@ function show_message(text) {
         msg.style.fontSize = '24px';
         msg.style.fontWeight = 'bold';
         msg.style.zIndex = '1001';
-        msg.style.display = 'none';
         document.body.appendChild(msg);
     }
-    
     msg.textContent = text;
     msg.style.display = 'block';
-    setTimeout(() => { msg.style.display = 'none'; }, 2000);
+    setTimeout(() => { msg.style.display = 'none'; }, 1500);
 }
 
-// Create particle sparkles
-function create_sparkles(x, y, z, color, count) {
-    for (let i = 0; i < count; i++) {
-        const sparkleGeo = new THREE.OctahedronGeometry(0.05, 0);
-        const sparkleMat = new THREE.MeshBasicMaterial({ 
-            color: color,
-            transparent: true,
-            opacity: 1.0
-        });
-        const sparkle = new THREE.Mesh(sparkleGeo, sparkleMat);
-        sparkle.position.set(x, y, z);
-        
-        const angle = (i / count) * Math.PI * 2;
-        const speed = 0.02 + Math.random() * 0.02;
-        sparkle.userData.vx = Math.cos(angle) * speed;
-        sparkle.userData.vy = 0.01 + Math.random() * 0.02;
-        sparkle.userData.vz = Math.sin(angle) * speed;
-        sparkle.userData.lifetime = 1000;
-        sparkle.userData.created = Date.now();
-        
-        scene.add(sparkle);
+function shake_nearest_tree() {
+    let nearest = null;
+    let nearestDist = Infinity;
+    
+    for (const tree of number_trees) {
+        const dist = Math.sqrt(
+            (character.position.x - tree.position.x) ** 2 +
+            (character.position.z - tree.position.z) ** 2
+        );
+        if (dist < nearestDist && dist < 2.5) {
+            nearest = tree;
+            nearestDist = dist;
+        }
+    }
+    
+    if (nearest) {
+        shake_tree(nearest);
     }
 }
 
-// Update sparkles (should be called in game loop)
-function update_sparkles() {
-    const now = Date.now();
-    const toRemove = [];
+// 게임 초기화 시 나무 생성
+function setup_number_trees() {
+    create_number_tree(12, 5);
+    create_number_tree(-8, 10);
+    create_number_tree(5, -12);
     
-    scene.traverse((obj) => {
-        if (obj.userData && obj.userData.lifetime && obj.userData.created) {
-            if (now - obj.userData.created > obj.userData.lifetime) {
-                toRemove.push(obj);
-            } else if (obj.userData.vx) {
-                obj.position.x += obj.userData.vx;
-                obj.position.y += obj.userData.vy;
-                obj.position.z += obj.userData.vz;
-                obj.userData.vy -= 0.0005;
-            }
+    // 나무 흔들기 터치 이벤트
+    window.addEventListener('keydown', (e) => {
+        if (e.code === 'KeyE') {
+            shake_nearest_tree();
         }
-    });
-    
-    toRemove.forEach(obj => {
-        scene.remove(obj);
     });
 }
 
-// Export functions
-window.trees_module = {
-    create_number_tree,
-    shake_tree,
-    update_trees,
-    collect_fruits,
-    update_hud,
-    show_message,
-    update_sparkles
-};
+// 메인 게임 루프에 통합
+window.number_trees = number_trees;
+window.update_fruits = update_fruits;
+window.collect_fruits_near_player = collect_fruits_near_player;
+window.update_hud = update_hud;
+window.setup_number_trees = setup_number_trees;
+window.shake_nearest_tree = shake_nearest_tree;

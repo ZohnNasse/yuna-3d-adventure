@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>유나 3D 어드벤처</title>
+<title>유나 3D 어드벤처 - 숫자 열매</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -13,7 +13,7 @@
     -webkit-tap-highlight-color: transparent;
   }
   canvas { display: block; width: 100%; height: 100%; }
-  
+
   #hud {
     position: fixed; top: 10px; left: 10px;
     color: white; font-size: 14px; z-index: 100;
@@ -23,7 +23,7 @@
     box-shadow: 0 4px 15px rgba(0,0,0,0.3);
   }
   #hud div { margin: 4px 0; font-weight: 600; }
-  
+
   #start-screen, #win-screen {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
     display: flex; flex-direction: column;
@@ -48,7 +48,7 @@
   }
   #win-screen { display: none; }
   #win-screen h1 { color: #FFD700; font-size: 36px; }
-  
+
   #game-hud {
     position: fixed; top: 10px; right: 10px;
     background: rgba(0,0,0,0.7); color: white;
@@ -65,7 +65,7 @@
     font-weight: bold; z-index: 1001;
     display: none;
   }
-  
+
   #jump-btn {
     position: fixed; bottom: 20px; right: 20px;
     width: 80px; height: 80px; border-radius: 50%;
@@ -78,7 +78,7 @@
     cursor: pointer;
   }
   #jump-btn:active { background: rgba(255,107,157,0.8); transform: scale(0.95); }
-  
+
   #particles {
     position: fixed; top: 0; left: 0; width: 100%; height: 100%;
     pointer-events: none; z-index: 50;
@@ -110,18 +110,10 @@
 
 <div id="start-screen">
   <h1>🎮 유나 3D 어드벤처</h1>
-  <p>PC: WASD/화살표 이동 | Space 점프 | Shift 대시</p>
-  <p>모바일: 화면 탭으로 이동 | 점프 버튼</p>
-  <p>💎 보석 5개를 모두 수집하면 승리!</p>
-  <script>
-function startGame() {
-  document.getElementById('start-screen').style.display = 'none';
-  window.gameStarted = true;
-  window.startTime = Date.now();
-}
-</script>
-
-<button id="start-btn" onclick="startGame()">시작</button>
+  <p>PC: WASD/화살표 이동 | Space 점프 | E 나무 흔들기</p>
+  <p>모바일: 화면 탭 이동 | 점프 버튼 | 나무 탭 흔들기</p>
+  <p>💎 보석 5개 수집 + 🌳 나무 흔들면 숫자 열매 주워 10 만들기!</p>
+  <button id="start-btn">시작</button>
 </div>
 
 <div id="win-screen">
@@ -137,20 +129,20 @@ function startGame() {
 <script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
 <script>
 
-let score = 0, collected = 0, startTime = window.startTime || 0, elapsed = 0;
-let gameOver = false;
-let number_trees = [];
+let score = 0, collected = 0, startTime = 0, elapsed = 0;
+let gameStarted = false, gameOver = false;
 const gems = [];
 let character;
 const obstacles = [];
 
+// Tree shaking game state
+let number_trees = [];
+let current_sum = 0;
+const fruits = [];
+
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x44ff44);
 scene.fog = new THREE.FogExp2(0x87CEEB, 0.008);
-// Debug: Add a red cube to verify renderer works
-const debugCube = new THREE.Mesh(new THREE.BoxGeometry(1,1,1), new THREE.MeshLambertMaterial({color:0xff0000}));
-debugCube.position.set(0, 5, 0);
-scene.add(debugCube);
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 200);
 camera.position.set(0, 10, 15);
@@ -207,7 +199,7 @@ for (let i = 0; i < 500; i++) {
   scene.add(grass);
 }
 
-// Trees
+// Regular Trees
 function createTree(x, z) {
   const tree = new THREE.Group();
   const trunkGeo = new THREE.CylinderGeometry(0.2, 0.4, 2.5, 8);
@@ -289,22 +281,23 @@ for (let i = 0; i < 100; i++) {
   scene.add(head);
 }
 
-// Character
+// Character - cute girl
 function createCharacter() {
   const charGroup = new THREE.Group();
-  charGroup.position.y = 0.8; // Raise so feet are on ground
+  charGroup.position.y = 0.8;
   
-  // Body / Torso (skin tone)
-  const torsoGeo = new THREE.CylinderGeometry(0.2, 0.22, 0.6, 12);
   const skinMat = new THREE.MeshPhongMaterial({ color: 0xFFE4D6, specular: 0xAAAAAA, shininess: 20 });
+  
+  // Body / Torso
+  const torsoGeo = new THREE.CylinderGeometry(0.2, 0.22, 0.6, 12);
   const torso = new THREE.Mesh(torsoGeo, skinMat);
   torso.position.y = 0.9;
   torso.castShadow = true;
   charGroup.add(torso);
   
   // Dress top (pink)
-  const dressTopGeo = new THREE.CylinderGeometry(0.22, 0.25, 0.35, 12);
   const dressMat = new THREE.MeshPhongMaterial({ color: 0xFF6B9D, specular: 0xFFB6C1, shininess: 40 });
+  const dressTopGeo = new THREE.CylinderGeometry(0.22, 0.25, 0.35, 12);
   const dressTop = new THREE.Mesh(dressTopGeo, dressMat);
   dressTop.position.y = 1.0;
   dressTop.castShadow = true;
@@ -330,10 +323,8 @@ function createCharacter() {
   head.castShadow = true;
   charGroup.add(head);
   
-  // Hair - long flowing pink hair
+  // Hair - long flowing pink
   const hairMat = new THREE.MeshPhongMaterial({ color: 0xFF8FC1, specular: 0xFFD1E8, shininess: 80 });
-  
-  // Hair top
   const hairTopGeo = new THREE.SphereGeometry(0.32, 24, 12, 0, Math.PI * 2, 0, Math.PI * 0.55);
   const hairTop = new THREE.Mesh(hairTopGeo, hairMat);
   hairTop.position.y = 1.55;
@@ -351,25 +342,13 @@ function createCharacter() {
     charGroup.add(hairStrand);
   }
   
-  // Hair bangs (front)
-  for (let i = 0; i < 4; i++) {
-    const bangGeo = new THREE.SphereGeometry(0.08, 8, 8);
-    const bang = new THREE.Mesh(bangGeo, hairMat);
-    const angle = (i - 1.5) * 0.3;
-    bang.position.set(Math.sin(angle) * 0.15, 1.7, 0.25);
-    bang.scale.set(1, 1.3, 0.6);
-    charGroup.add(bang);
-  }
-  
   // Eyes (big anime style)
   const eyeWhiteGeo = new THREE.SphereGeometry(0.08, 16, 12);
   const eyeWhiteMat = new THREE.MeshPhongMaterial({ color: 0xFFFFFF, specular: 0xFFFFFF, shininess: 100 });
   const irisGeo = new THREE.SphereGeometry(0.045, 12, 8);
-  const irisMat = new THREE.MeshPhongMaterial({ color: 0x8B5CF6, specular: 0xFFFFFF, shininess: 80 }); // purple eyes
+  const irisMat = new THREE.MeshPhongMaterial({ color: 0x8B5CF6, specular: 0xFFFFFF, shininess: 80 });
   const pupilGeo = new THREE.SphereGeometry(0.02, 8, 6);
   const pupilMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
-  const eyeHighlightGeo = new THREE.SphereGeometry(0.012, 6, 4);
-  const eyeHighlightMat = new THREE.MeshBasicMaterial({ color: 0xFFFFFF });
   
   // Left eye
   const leftEyeWhite = new THREE.Mesh(eyeWhiteGeo, eyeWhiteMat);
@@ -382,9 +361,6 @@ function createCharacter() {
   const leftPupil = new THREE.Mesh(pupilGeo, pupilMat);
   leftPupil.position.set(-0.1, 1.58, 0.33);
   charGroup.add(leftPupil);
-  const leftHighlight = new THREE.Mesh(eyeHighlightGeo, eyeHighlightMat);
-  leftHighlight.position.set(-0.11, 1.6, 0.33);
-  charGroup.add(leftHighlight);
   
   // Right eye
   const rightEyeWhite = new THREE.Mesh(eyeWhiteGeo, eyeWhiteMat);
@@ -397,39 +373,8 @@ function createCharacter() {
   const rightPupil = new THREE.Mesh(pupilGeo, pupilMat);
   rightPupil.position.set(0.1, 1.58, 0.33);
   charGroup.add(rightPupil);
-  const rightHighlight = new THREE.Mesh(eyeHighlightGeo, eyeHighlightMat);
-  rightHighlight.position.set(0.09, 1.6, 0.33);
-  charGroup.add(rightHighlight);
   
-  // Eyelashes
-  const lashGeo = new THREE.CylinderGeometry(0.004, 0.004, 0.05, 4);
-  const lashMat = new THREE.MeshBasicMaterial({ color: 0x333333 });
-  for (let side = -1; side <= 1; side += 2) {
-    for (let i = 0; i < 3; i++) {
-      const lash = new THREE.Mesh(lashGeo, lashMat);
-      const angle = (i - 1) * 0.3;
-      lash.position.set(side * 0.1, 1.65, 0.3);
-      lash.rotation.x = -1.2;
-      lash.rotation.z = angle;
-      charGroup.add(lash);
-    }
-  }
-  
-  // Nose (tiny)
-  const noseGeo = new THREE.SphereGeometry(0.025, 8, 6);
-  const nose = new THREE.Mesh(noseGeo, skinMat);
-  nose.position.set(0, 1.53, 0.3);
-  charGroup.add(nose);
-  
-  // Mouth (small smile)
-  const smileGeo = new THREE.TorusGeometry(0.04, 0.01, 4, 8, Math.PI);
-  const smileMat = new THREE.MeshBasicMaterial({ color: 0xE8707A });
-  const smile = new THREE.Mesh(smileGeo, smileMat);
-  smile.position.set(0, 1.48, 0.29);
-  smile.rotation.x = Math.PI;
-  charGroup.add(smile);
-  
-  // Cheeks (rosy)
+  // Cheeks
   const cheekGeo = new THREE.SphereGeometry(0.06, 10, 8);
   const cheekMat = new THREE.MeshBasicMaterial({ color: 0xFFB6C1, transparent: true, opacity: 0.4 });
   const leftCheek = new THREE.Mesh(cheekGeo, cheekMat);
@@ -453,15 +398,6 @@ function createCharacter() {
   rightArm.rotation.z = -0.3;
   rightArm.castShadow = true;
   charGroup.add(rightArm);
-  
-  // Hands
-  const handGeo = new THREE.SphereGeometry(0.06, 8, 6);
-  const leftHand = new THREE.Mesh(handGeo, skinMat);
-  leftHand.position.set(-0.32, 0.75, 0);
-  charGroup.add(leftHand);
-  const rightHand = new THREE.Mesh(handGeo, skinMat);
-  rightHand.position.set(0.32, 0.75, 0);
-  charGroup.add(rightHand);
   
   // Legs
   const legGeo = new THREE.CylinderGeometry(0.06, 0.05, 0.5, 8);
@@ -492,32 +428,10 @@ function createCharacter() {
   bow.scale.set(1.5, 0.5, 1);
   charGroup.add(bow);
   
-  // Sparkles around character
-  const sparkleGeo = new THREE.OctahedronGeometry(0.03, 0);
-  const sparkleMat = new THREE.MeshBasicMaterial({ 
-    color: 0xFFFFFF,
-    transparent: true,
-    opacity: 0.8
-  });
-  for (let i = 0; i < 5; i++) {
-    const sparkle = new THREE.Mesh(sparkleGeo, sparkleMat);
-    const angle = (i / 5) * Math.PI * 2;
-    sparkle.position.set(
-      Math.cos(angle) * 0.7,
-      1.0 + Math.sin(angle) * 0.3,
-      Math.sin(angle) * 0.5
-    );
-    charGroup.add(sparkle);
-  }
-  
-  charGroup.userData.isCharacter = true;
-  charGroup.userData.sparkles = [];
-  charGroup.children.forEach(c => { if (c.geometry && c.geometry.type === 'OctahedronGeometry') charGroup.userData.sparkles.push(c); });
   return charGroup;
 }
 
 character = createCharacter();
-setup_number_trees();
 scene.add(character);
 
 // Gems
@@ -557,363 +471,31 @@ gemPositions.forEach(pos => {
   gems.push({ mesh: gem, ring: ring, collected: false, baseY: pos[1] });
 });
 
-// Movement target
-let moveTarget = null;
-let moving = false;
-
-// PC keyboard controls
-const keys = {};
-window.addEventListener('keydown', e => { keys[e.code] = true; });
-window.addEventListener('keyup', e => { keys[e.code] = false; });
-
-// Touch to move
-const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
-
-function onGroundClick(event) {
-  if (!window.gameStarted || gameOver) return;
-  
-  // Skip if clicking on UI
-  if (event.target !== renderer.domElement) return;
-  
-  const x = event.clientX || (event.touches && event.touches[0].clientX);
-  const y = event.clientY || (event.touches && event.touches[0].clientY);
-  
-  mouse.x = (x / window.innerWidth) * 2 - 1;
-  mouse.y = -(y / window.innerHeight) * 2 + 1;
-  
-  raycaster.setFromCamera(mouse, camera);
-  
-  // Intersect with ground plane
-  const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-  const target = new THREE.Vector3();
-  raycaster.ray.intersectPlane(groundPlane, target);
-  
-  if (target) {
-    moveTarget = target;
-    moving = true;
-    
-    // Show target marker
-    const marker = document.getElementById('target-marker');
-    // Project to screen coords
-    const screenPos = target.clone().project(camera);
-    const sx = (screenPos.x * 0.5 + 0.5) * window.innerWidth;
-    const sy = (-screenPos.y * 0.5 + 0.5) * window.innerHeight;
-    marker.style.left = (sx - 20) + 'px';
-    marker.style.top = (sy - 20) + 'px';
-    marker.style.display = 'block';
-    setTimeout(() => { marker.style.display = 'none'; }, 600);
-  }
-}
-
-renderer.domElement.addEventListener('click', onGroundClick);
-renderer.domElement.addEventListener('touchstart', onGroundClick, { passive: true });
-
-// Jump
-let isJumping = false;
-let characterVelocity = { x: 0, y: 0, z: 0 };
-
-document.getElementById('jump-btn').addEventListener('click', () => {
-  if (gameStarted && !gameOver && !isJumping) {
-    characterVelocity.y = 10;
-    isJumping = true;
-  }
-});
-document.getElementById('jump-btn').addEventListener('touchstart', (e) => {
-  e.preventDefault();
-  if (gameStarted && !gameOver && !isJumping) {
-    characterVelocity.y = 10;
-    isJumping = true;
-  }
-}, { passive: false });
-
-window.addEventListener('keydown', (e) => {
-  if (e.code === 'Space' && gameStarted && !gameOver && !isJumping) {
-    characterVelocity.y = 10;
-    isJumping = true;
-  }
-});
-
-// Particles
-const particlesContainer = document.getElementById('particles');
-function spawnParticles(x, y, count, color) {
-  for (let i = 0; i < count; i++) {
-    const p = document.createElement('div');
-    p.style.cssText = 'position: absolute; left: ' + x + 'px; top: ' + y + 'px; width: 8px; height: 8px; border-radius: 50%; background: ' + color + '; pointer-events: none; z-index: 50; animation: particle-fly 0.8s ease-out forwards;';
-    const angle = Math.random() * Math.PI * 2;
-    const dist = 30 + Math.random() * 50;
-    p.style.setProperty('--dx', Math.cos(angle) * dist + 'px');
-    p.style.setProperty('--dy', Math.sin(angle) * dist + 'px');
-    particlesContainer.appendChild(p);
-    setTimeout(() => p.remove(), 800);
-  }
-}
-
-let clock = new THREE.Clock();
-
-function checkCollisions(newX, newZ) {
-  for (const obs of obstacles) {
-    const dx = newX - obs.mesh.position.x;
-    const dz = newZ - obs.mesh.position.z;
-    const dist = Math.sqrt(dx*dx + dz*dz);
-    if (dist < obs.radius + 0.5) {
-      return true;
-    }
-  }
-  return false;
-}
-
-function update(delta) {
-  if (!window.gameStarted || gameOver) return;
-
-  elapsed = clock.getElapsedTime() - startTime;
-  document.getElementById('time').textContent = Math.floor(elapsed);
-
-  const speed = 8;
-  let moved = false;
-  let moveDir = { x: 0, z: 0 };
-
-  // PC keyboard
-  if (keys['KeyW'] || keys['ArrowUp']) { moveDir.z = -1; moved = true; }
-  if (keys['KeyS'] || keys['ArrowDown']) { moveDir.z = 1; moved = true; }
-  if (keys['KeyA'] || keys['ArrowLeft']) { moveDir.x = -1; moved = true; }
-  if (keys['KeyD'] || keys['ArrowRight']) { moveDir.x = 1; moved = true; }
-
-  // Touch move target
-  if (moveTarget && moving) {
-    const dx = moveTarget.x - character.position.x;
-    const dz = moveTarget.z - character.position.z;
-    const dist = Math.sqrt(dx*dx + dz*dz);
-    
-    if (dist > 0.5) {
-      moveDir.x = dx / dist;
-      moveDir.z = dz / dist;
-      moved = true;
-    } else {
-      moving = false;
-      moveTarget = null;
-    }
-  }
-
-  if (moved) {
-    const length = Math.sqrt(moveDir.x * moveDir.x + moveDir.z * moveDir.z);
-    moveDir.x /= length;
-    moveDir.z /= length;
-
-    character.rotation.y = Math.atan2(moveDir.x, moveDir.z);
-
-    const newX = character.position.x + moveDir.x * speed * delta;
-    const newZ = character.position.z + moveDir.z * speed * delta;
-
-    if (!checkCollisions(newX, character.position.z)) {
-      character.position.x = newX;
-    }
-    if (!checkCollisions(character.position.x, newZ)) {
-      character.position.z = newZ;
-    }
-  }
-
-  // Gravity
-  characterVelocity.y -= 25 * delta;
-  character.position.y += characterVelocity.y * delta;
-
-  if (character.position.y <= 0) {
-    character.position.y = 0;
-    characterVelocity.y = 0;
-    isJumping = false;
-  }
-
-  // Camera follow
-  const targetX = character.position.x;
-  const targetZ = character.position.z + 12;
-  camera.position.x += (targetX - camera.position.x) * 0.05;
-  camera.position.z += (targetZ - camera.position.z) * 0.05;
-  camera.position.y = 10;
-  camera.lookAt(character.position.x, character.position.y + 1, character.position.z);
-
-  // Bounce animation
-  if (moved && !isJumping) {
-    const bounce = Math.sin(clock.getElapsedTime() * 15) * 0.05;
-    character.children[0].position.y = 0.5 + bounce;
-  }
-
-  // Sparkles
-  character.children.forEach((child, i) => {
-    if (i >= 9 && child.userData.angle !== undefined) {
-      child.rotation.y += delta * child.userData.speed;
-      const t = clock.getElapsedTime() * child.userData.speed;
-      child.position.y = 0.5 + Math.sin(t + child.userData.angle) * 0.3;
-    }
-  });
-
-  // Gems
-  gems.forEach(gem => {
-    if (gem.collected) return;
-
-    gem.mesh.rotation.y += delta * 3;
-    gem.mesh.rotation.x += delta * 1.5;
-    gem.mesh.position.y = gem.baseY + Math.sin(clock.getElapsedTime() * 2.5) * 0.3;
-    gem.ring.rotation.z += delta * 0.5;
-    gem.ring.material.opacity = 0.3 + Math.sin(clock.getElapsedTime() * 2) * 0.2;
-
-    const dist = character.position.distanceTo(gem.mesh.position);
-    if (dist < 1.5) {
-      gem.collected = true;
-      gem.mesh.visible = false;
-      gem.ring.visible = false;
-      collected++;
-      score += 100;
-      document.getElementById('score').textContent = score;
-      document.getElementById('collected').textContent = collected;
-
-      const screenPos = gem.mesh.position.clone().project(camera);
-      const sx = (screenPos.x * 0.5 + 0.5) * window.innerWidth;
-      const sy = (-screenPos.y * 0.5 + 0.5) * window.innerHeight;
-      spawnParticles(sx, sy, 20, '#FFD700');
-
-      if (collected >= 5) {
-        gameOver = true;
-        const winScreen = document.getElementById('win-screen');
-        winScreen.style.display = 'flex';
-        const bonus = Math.max(0, 1000 - elapsed * 10);
-        score += bonus;
-        document.getElementById('score').textContent = score;
-        document.getElementById('win-text').textContent =
-          Math.floor(elapsed) + '초 만에 모든 보석을 수집했습니다! 점수: ' + score;
-        spawnParticles(window.innerWidth/2, window.innerHeight/2, 50, '#FFD700');
-      }
-    }
-  });
-
-  // Boundary
-  if (Math.abs(character.position.x) > 90) character.position.x = Math.sign(character.position.x) * 90;
-  if (Math.abs(character.position.z) > 90) character.position.z = Math.sign(character.position.z) * 90;
-}
-
-function animate() {
-  requestAnimationFrame(animate);
-  const delta = Math.min(clock.getDelta(), 0.05);
-  update(delta);
-  if (window.number_trees) { window.number_trees.update(); }
-update_fruits(); collect_fruits_near_player(); update_sparkles();
-  renderer.render(scene, camera);
-}
-
-document.getElementById('start-btn').onclick = function() {
-  document.getElementById('start-screen').style.display = 'none';
-  gameStarted = true;
-  startTime = clock.getElapsedTime();
-};
-
-document.getElementById('start-btn').ontouchstart = function(e) {
-  e.preventDefault();
-  document.getElementById('start-screen').style.display = 'none';
-  gameStarted = true;
-  startTime = clock.getElapsedTime();
-};
-
-document.getElementById('start-btn').addEventListener('touchstart', (e) => {
-  e.preventDefault();
-  document.getElementById('start-screen').style.display = 'none';
-  gameStarted = true;
-  startTime = clock.getElapsedTime();
-});
-
-document.getElementById('restart-btn').addEventListener('click', () => {
-  score = 0; collected = 0; gameOver = false;
-  document.getElementById('score').textContent = '0';
-  document.getElementById('collected').textContent = '0';
-  document.getElementById('win-screen').style.display = 'none';
-
-  character.position.set(0, 0, 0);
-  characterVelocity = { x: 0, y: 0, z: 0 };
-  moving = false;
-  moveTarget = null;
-
-  gems.forEach(gem => {
-    gem.collected = false;
-    gem.mesh.visible = true;
-    gem.ring.visible = true;
-  });
-
-  startTime = clock.getElapsedTime();
-});
-
-document.getElementById('restart-btn').addEventListener('touchstart', (e) => {
-  e.preventDefault();
-  score = 0; collected = 0; gameOver = false;
-  document.getElementById('score').textContent = '0';
-  document.getElementById('collected').textContent = '0';
-  document.getElementById('win-screen').style.display = 'none';
-
-  character.position.set(0, 0, 0);
-  characterVelocity = { x: 0, y: 0, z: 0 };
-  moving = false;
-  moveTarget = null;
-
-  gems.forEach(gem => {
-    gem.collected = false;
-    gem.mesh.visible = true;
-    gem.ring.visible = true;
-  });
-
-  startTime = clock.getElapsedTime();
-});
-
-document.getElementById('restart-btn').addEventListener('touchstart', (e) => {
-  e.preventDefault();
-  score = 0; collected = 0; gameOver = false;
-  document.getElementById('score').textContent = '0';
-  document.getElementById('collected').textContent = '0';
-  document.getElementById('win-screen').style.display = 'none';
-
-  character.position.set(0, 0, 0);
-  characterVelocity = { x: 0, y: 0, z: 0 };
-  moving = false;
-  moveTarget = null;
-
-  gems.forEach(gem => {
-    gem.collected = false;
-    gem.mesh.visible = true;
-    gem.ring.visible = true;
-  });
-
-  startTime = clock.getElapsedTime();
-});
-
-window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-});
-
-// Number fruit trees
-let current_sum = 0;
-const fruits = [];
-
+// Number Trees
 function create_number_tree(x, z) {
-    const group = new THREE.Group();
+    const tree = new THREE.Group();
     
     const trunkGeo = new THREE.CylinderGeometry(0.15, 0.2, 1.5, 8);
     const trunkMat = new THREE.MeshPhongMaterial({ color: 0x8B4513, specular: 0x333333, shininess: 20 });
     const trunk = new THREE.Mesh(trunkGeo, trunkMat);
     trunk.position.y = 0.75;
     trunk.castShadow = true;
-    group.add(trunk);
+    tree.add(trunk);
     
     const leavesGeo = new THREE.SphereGeometry(0.8, 16, 12);
     const leavesMat = new THREE.MeshPhongMaterial({ color: 0x228B22, specular: 0x55FF55, shininess: 30 });
     const leaves = new THREE.Mesh(leavesGeo, leavesMat);
     leaves.position.y = 1.8;
     leaves.castShadow = true;
-    group.add(leaves);
+    tree.add(leaves);
     
-    group.position.set(x, 0, z);
-    group.userData.lastShake = 0;
-    group.userData.isFruitTree = true;
-    scene.add(group);
+    tree.position.set(x, 0, z);
+    tree.userData.lastShake = 0;
+    tree.userData.isFruitTree = true;
     
-    return group;
+    scene.add(tree);
+    number_trees.push(tree);
+    return tree;
 }
 
 function shake_tree(tree) {
@@ -1084,87 +666,331 @@ function show_message(text) {
         msg.style.fontSize = '24px';
         msg.style.fontWeight = 'bold';
         msg.style.zIndex = '1001';
-        msg.style.display = 'none';
         document.body.appendChild(msg);
     }
     msg.textContent = text;
     msg.style.display = 'block';
-    setTimeout(() => { msg.style.display = 'none'; }, 2000);
-}
-
-function create_sparkles(x, y, z, color, count) {
-    for (let i = 0; i < count; i++) {
-        const sparkleGeo = new THREE.OctahedronGeometry(0.05, 0);
-        const sparkleMat = new THREE.MeshBasicMaterial({ 
-            color: color,
-            transparent: true,
-            opacity: 1.0
-        });
-        const sparkle = new THREE.Mesh(sparkleGeo, sparkleMat);
-        sparkle.position.set(x, y, z);
-        
-        const angle = (i / count) * Math.PI * 2;
-        const speed = 0.02 + Math.random() * 0.02;
-        sparkle.userData.vx = Math.cos(angle) * speed;
-        sparkle.userData.vy = 0.01 + Math.random() * 0.02;
-        sparkle.userData.vz = Math.sin(angle) * speed;
-        sparkle.userData.lifetime = 1000;
-        sparkle.userData.created = Date.now();
-        scene.add(sparkle);
-    }
-}
-
-function update_sparkles() {
-    const now = Date.now();
-    const toRemove = [];
-    scene.traverse((obj) => {
-        if (obj.userData && obj.userData.lifetime && obj.userData.created) {
-            if (now - obj.userData.created > obj.userData.lifetime) {
-                toRemove.push(obj);
-            } else if (obj.userData.vx) {
-                obj.position.x += obj.userData.vx;
-                obj.position.y += obj.userData.vy;
-                obj.position.z += obj.userData.vz;
-                obj.userData.vy -= 0.0005;
-            }
-        }
-    });
-    toRemove.forEach(obj => { scene.remove(obj); });
+    setTimeout(() => { msg.style.display = 'none'; }, 1500);
 }
 
 function shake_nearest_tree() {
     let nearest = null;
     let nearestDist = Infinity;
+    
     for (const tree of number_trees) {
         const dist = Math.sqrt(
             (character.position.x - tree.position.x) ** 2 +
             (character.position.z - tree.position.z) ** 2
         );
-        if (dist < nearestDist && dist < 3.0) {
+        if (dist < nearestDist && dist < 2.5) {
             nearest = tree;
             nearestDist = dist;
         }
     }
+    
     if (nearest) {
         shake_tree(nearest);
     }
 }
 
-function setup_number_trees() {
-    number_trees.push(create_number_tree(12, 5));
-    number_trees.push(create_number_tree(-8, 10));
-    number_trees.push(create_number_tree(5, -12));
-    show_message("🌳 나무에走近해서 S 키로 흔들면 열매가 떨어져요!");
+// Create 3 number trees
+create_number_tree(12, 5);
+create_number_tree(-8, 10);
+create_number_tree(5, -12);
+
+// Keyboard controls
+const keys = {};
+window.addEventListener('keydown', e => { keys[e.code] = true; });
+window.addEventListener('keyup', e => { keys[e.code] = false; });
+
+// Touch to move
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+function onGroundClick(event) {
+  if (!gameStarted || gameOver) return;
+  if (event.target !== renderer.domElement) return;
+  
+  const x = event.clientX || (event.touches && event.touches[0].clientX);
+  const y = event.clientY || (event.touches && event.touches[0].clientY);
+  
+  mouse.x = (x / window.innerWidth) * 2 - 1;
+  mouse.y = -(y / window.innerHeight) * 2 + 1;
+  
+  raycaster.setFromCamera(mouse, camera);
+  
+  const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  const target = new THREE.Vector3();
+  raycaster.ray.intersectPlane(groundPlane, target);
+  
+  if (target) {
+    moveTarget = target;
+    moving = true;
+    
+    const marker = document.getElementById('target-marker');
+    const screenPos = target.clone().project(camera);
+    const sx = (screenPos.x * 0.5 + 0.5) * window.innerWidth;
+    const sy = (-screenPos.y * 0.5 + 0.5) * window.innerHeight;
+    marker.style.left = (sx - 20) + 'px';
+    marker.style.top = (sy - 20) + 'px';
+    marker.style.display = 'block';
+    setTimeout(() => { marker.style.display = 'none'; }, 600);
+  }
 }
 
-document.addEventListener('keydown', (e) => {
-    if (e.key.toLowerCase() === 's' && !e.shiftKey && !e.ctrlKey && !e.altKey && !moving) {
-        shake_nearest_tree();
+renderer.domElement.addEventListener('click', onGroundClick);
+renderer.domElement.addEventListener('touchstart', onGroundClick, { passive: true });
+
+let moveTarget = null;
+let moving = false;
+let isJumping = false;
+let characterVelocity = { x: 0, y: 0, z: 0 };
+
+document.getElementById('jump-btn').addEventListener('click', () => {
+  if (gameStarted && !gameOver && !isJumping) {
+    characterVelocity.y = 10;
+    isJumping = true;
+  }
+});
+
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'Space' && gameStarted && !gameOver && !isJumping) {
+    characterVelocity.y = 10;
+    isJumping = true;
+  }
+  if (e.code === 'KeyE' && gameStarted && !gameOver) {
+    shake_nearest_tree();
+  }
+});
+
+// Particles
+const particlesContainer = document.getElementById('particles');
+function spawnParticles(x, y, count, color) {
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement('div');
+    p.style.cssText = 'position: absolute; left: ' + x + 'px; top: ' + y + 'px; width: 8px; height: 8px; border-radius: 50%; background: ' + color + '; pointer-events: none; z-index: 50; animation: particle-fly 0.8s ease-out forwards;';
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 30 + Math.random() * 50;
+    p.style.setProperty('--dx', Math.cos(angle) * dist + 'px');
+    p.style.setProperty('--dy', Math.sin(angle) * dist + 'px');
+    particlesContainer.appendChild(p);
+    setTimeout(() => p.remove(), 800);
+  }
+}
+
+function create_sparkles(x, y, z, color, count) {
+  for (let i = 0; i < count; i++) {
+    const geo = new THREE.OctahedronGeometry(0.05, 0);
+    const mat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.8 });
+    const sparkle = new THREE.Mesh(geo, mat);
+    sparkle.position.set(x, y, z);
+    scene.add(sparkle);
+    setTimeout(() => scene.remove(sparkle), 500);
+  }
+}
+
+let clock = new THREE.Clock();
+
+function checkCollisions(newX, newZ) {
+  for (const obs of obstacles) {
+    const dx = newX - obs.mesh.position.x;
+    const dz = newZ - obs.mesh.position.z;
+    const dist = Math.sqrt(dx*dx + dz*dz);
+    if (dist < obs.radius + 0.5) {
+      return true;
     }
+  }
+  return false;
+}
+
+function update(delta) {
+  if (!gameStarted || gameOver) return;
+
+  elapsed = clock.getElapsedTime() - startTime;
+  document.getElementById('time').textContent = Math.floor(elapsed);
+
+  const speed = 8;
+  let moved = false;
+  let moveDir = { x: 0, z: 0 };
+
+  if (keys['KeyW'] || keys['ArrowUp']) { moveDir.z = -1; moved = true; }
+  if (keys['KeyS'] || keys['ArrowDown']) { moveDir.z = 1; moved = true; }
+  if (keys['KeyA'] || keys['ArrowLeft']) { moveDir.x = -1; moved = true; }
+  if (keys['KeyD'] || keys['ArrowRight']) { moveDir.x = 1; moved = true; }
+
+  if (moveTarget && moving) {
+    const dx = moveTarget.x - character.position.x;
+    const dz = moveTarget.z - character.position.z;
+    const dist = Math.sqrt(dx*dx + dz*dz);
+    
+    if (dist > 0.5) {
+      moveDir.x = dx / dist;
+      moveDir.z = dz / dist;
+      moved = true;
+    } else {
+      moving = false;
+      moveTarget = null;
+    }
+  }
+
+  if (moved) {
+    const length = Math.sqrt(moveDir.x * moveDir.x + moveDir.z * moveDir.z);
+    moveDir.x /= length;
+    moveDir.z /= length;
+
+    character.rotation.y = Math.atan2(moveDir.x, moveDir.z);
+
+    const newX = character.position.x + moveDir.x * speed * delta;
+    const newZ = character.position.z + moveDir.z * speed * delta;
+
+    if (!checkCollisions(newX, character.position.z)) {
+      character.position.x = newX;
+    }
+    if (!checkCollisions(character.position.x, newZ)) {
+      character.position.z = newZ;
+    }
+  }
+
+  characterVelocity.y -= 25 * delta;
+  character.position.y += characterVelocity.y * delta;
+
+  if (character.position.y <= 0) {
+    character.position.y = 0;
+    characterVelocity.y = 0;
+    isJumping = false;
+  }
+
+  const targetX = character.position.x;
+  const targetZ = character.position.z + 12;
+  camera.position.x += (targetX - camera.position.x) * 0.05;
+  camera.position.z += (targetZ - camera.position.z) * 0.05;
+  camera.position.y = 10;
+  camera.lookAt(character.position.x, character.position.y + 1, character.position.z);
+
+  if (moved && !isJumping) {
+    const bounce = Math.sin(clock.getElapsedTime() * 15) * 0.05;
+    character.children[0].position.y = 0.5 + bounce;
+  }
+
+  // Gems
+  gems.forEach(gem => {
+    if (gem.collected) return;
+
+    gem.mesh.rotation.y += delta * 3;
+    gem.mesh.rotation.x += delta * 1.5;
+    gem.mesh.position.y = gem.baseY + Math.sin(clock.getElapsedTime() * 2.5) * 0.3;
+    gem.ring.rotation.z += delta * 0.5;
+    gem.ring.material.opacity = 0.3 + Math.sin(clock.getElapsedTime() * 2) * 0.2;
+
+    const dist = character.position.distanceTo(gem.mesh.position);
+    if (dist < 1.5) {
+      gem.collected = true;
+      gem.mesh.visible = false;
+      gem.ring.visible = false;
+      collected++;
+      score += 100;
+      document.getElementById('score').textContent = score;
+      document.getElementById('collected').textContent = collected;
+
+      const screenPos = gem.mesh.position.clone().project(camera);
+      const sx = (screenPos.x * 0.5 + 0.5) * window.innerWidth;
+      const sy = (-screenPos.y * 0.5 + 0.5) * window.innerHeight;
+      spawnParticles(sx, sy, 20, '#FFD700');
+
+      if (collected >= 5) {
+        gameOver = true;
+        const winScreen = document.getElementById('win-screen');
+        winScreen.style.display = 'flex';
+        const bonus = Math.max(0, 1000 - elapsed * 10);
+        score += bonus;
+        document.getElementById('score').textContent = score;
+        document.getElementById('win-text').textContent =
+          Math.floor(elapsed) + '초 만에 모든 보석을 수집했습니다! 점수: ' + score;
+        spawnParticles(window.innerWidth/2, window.innerHeight/2, 50, '#FFD700');
+      }
+    }
+  });
+
+  if (Math.abs(character.position.x) > 90) character.position.x = Math.sign(character.position.x) * 90;
+  if (Math.abs(character.position.z) > 90) character.position.z = Math.sign(character.position.z) * 90;
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  const delta = Math.min(clock.getDelta(), 0.05);
+  update(delta);
+  update_fruits();
+  collect_fruits_near_player();
+  renderer.render(scene, camera);
+}
+
+document.getElementById('start-btn').addEventListener('click', () => {
+  document.getElementById('start-screen').style.display = 'none';
+  gameStarted = true;
+  startTime = clock.getElapsedTime();
+});
+
+document.getElementById('start-btn').addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  document.getElementById('start-screen').style.display = 'none';
+  gameStarted = true;
+  startTime = clock.getElapsedTime();
+});
+
+document.getElementById('restart-btn').addEventListener('click', () => {
+  score = 0; collected = 0; gameOver = false;
+  current_sum = 0;
+  document.getElementById('score').textContent = '0';
+  document.getElementById('collected').textContent = '0';
+  document.getElementById('win-screen').style.display = 'none';
+  fruits.forEach(f => scene.remove(f));
+  fruits.length = 0;
+
+  character.position.set(0, 0, 0);
+  characterVelocity = { x: 0, y: 0, z: 0 };
+  moving = false;
+  moveTarget = null;
+
+  gems.forEach(gem => {
+    gem.collected = false;
+    gem.mesh.visible = true;
+    gem.ring.visible = true;
+  });
+
+  startTime = clock.getElapsedTime();
+});
+
+document.getElementById('restart-btn').addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  score = 0; collected = 0; gameOver = false;
+  current_sum = 0;
+  document.getElementById('score').textContent = '0';
+  document.getElementById('collected').textContent = '0';
+  document.getElementById('win-screen').style.display = 'none';
+  fruits.forEach(f => scene.remove(f));
+  fruits.length = 0;
+
+  character.position.set(0, 0, 0);
+  characterVelocity = { x: 0, y: 0, z: 0 };
+  moving = false;
+  moveTarget = null;
+
+  gems.forEach(gem => {
+    gem.collected = false;
+    gem.mesh.visible = true;
+    gem.ring.visible = true;
+  });
+
+  startTime = clock.getElapsedTime();
+});
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
 animate();
 </script>
 </body>
 </html>
-
